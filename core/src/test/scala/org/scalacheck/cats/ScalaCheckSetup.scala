@@ -8,7 +8,7 @@ import org.scalacheck.cats.implicits._
 import org.scalacheck.rng.Seed
 
 trait ScalaCheckSetup {
-  
+
   implicit def genEq[A: Eq]: Eq[Gen[A]] =
     EqInstances.sampledGenEq(1000)
 
@@ -39,4 +39,17 @@ trait ScalaCheckSetup {
     Arbitrary(Arbitrary.arbitrary[Seed => Seed].map { f =>
       Cogen((seed, a) => f(Cogen[A].perturb(seed, a)))
     })
+
+  implicit val arbPF: Arbitrary[PartialFunction[Int, Int]] =
+    Arbitrary(
+      Arbitrary
+        .arbitrary[Int => Option[Int]]
+        .map(f =>
+          new PartialFunction[Int, Int] {
+            override def isDefinedAt(x: Int): Boolean = f(x).isDefined
+
+            override def apply(v1: Int): Int = f(v1).get
+        })
+    )
+
 }

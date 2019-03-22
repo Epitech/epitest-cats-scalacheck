@@ -1,100 +1,60 @@
-lazy val root = project.in(file("."))
-  .aggregate(
-    coreJVM,
-    coreJS,
-  )
+lazy val root = project
+  .in(file("."))
+  .aggregate(core)
   .settings(noPublishSettings)
   .settings(commonSettings, releaseSettings)
 
+lazy val core = project
+  .in(file("core"))
+  .settings(commonSettings, releaseSettings)
+  .settings(name := "epitest-cats-scalacheck")
 
-lazy val core = crossProject.in(file("core"))
-    .settings(commonSettings, releaseSettings, mimaSettings)
-    .settings(
-      name := "cats-scalacheck"
-    )
-
-lazy val coreJVM = core.jvm
-lazy val coreJS = core.js
-
-lazy val docs = project.in(file("docs"))
+lazy val docs = project
+  .in(file("docs"))
   .settings(noPublishSettings)
   .settings(commonSettings, micrositeSettings)
   .enablePlugins(MicrositesPlugin)
   .enablePlugins(TutPlugin)
-  .dependsOn(coreJVM)
+  .dependsOn(core)
 
 val catsV = "1.6.0"
-val scalacheckV = "1.14.0"
+val scalacheckV = "1.13.5"
 
 lazy val contributors = Seq(
-  "ChristopherDavenport" -> "Christopher Davenport"
+  "ChristopherDavenport" -> "Christopher Davenport",
+  "Epitech" -> "Epitech"
 )
 
 lazy val commonSettings = Seq(
-  organization := "io.chrisdavenport",
-
+  organization := "eu.epitech",
   scalaVersion := "2.12.8",
-  crossScalaVersions := Seq(scalaVersion.value, "2.11.12", "2.13.0-M5"),
-
-  addCompilerPlugin("org.spire-math" % "kind-projector" % "0.9.9" cross CrossVersion.binary),
-  addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.0-M4"),
-
+  addCompilerPlugin("org.spire-math" % "kind-projector"      % "0.9.9" cross CrossVersion.binary),
+  addCompilerPlugin("com.olegpy"     %% "better-monadic-for" % "0.3.0-M4"),
   libraryDependencies ++= Seq(
-    "org.typelevel"               %%% "cats-core"                  % catsV,
-    "org.scalacheck"              %%% "scalacheck"                 % scalacheckV,
-
-    "org.typelevel"               %%% "cats-laws"                  % catsV % Test,
-    "org.typelevel"               %%% "cats-testkit"               % catsV % Test
+    "org.typelevel" %% "cats-core"    % catsV,
+    "org.scalacheck" %% "scalacheck"  % scalacheckV,
+    "org.typelevel" %% "cats-laws"    % catsV % Test,
+    "org.typelevel" %% "cats-testkit" % catsV % Test
   )
 )
 
 lazy val releaseSettings = {
-  import ReleaseTransformations._
   Seq(
-    releaseCrossBuild := true,
-    releaseProcess := Seq[ReleaseStep](
-      checkSnapshotDependencies,
-      inquireVersions,
-      runClean,
-      runTest,
-      setReleaseVersion,
-      commitReleaseVersion,
-      tagRelease,
-      // For non cross-build projects, use releaseStepCommand("publishSigned")
-      releaseStepCommandAndRemaining("+publishSigned"),
-      setNextVersion,
-      commitNextVersion,
-      releaseStepCommand("sonatypeReleaseAll"),
-      pushChanges
-    ),
     publishTo := {
-      val nexus = "https://oss.sonatype.org/"
+      val nexus = "https://nexus.epitest.eu/repository/maven-"
       if (isSnapshot.value)
-        Some("snapshots" at nexus + "content/repositories/snapshots")
+        Some("snapshots" at nexus + "snapshots")
       else
-        Some("releases" at nexus + "service/local/staging/deploy/maven2")
+        Some("releases" at nexus + "releases")
     },
-    credentials ++= (
-      for {
-        username <- Option(System.getenv().get("SONATYPE_USERNAME"))
-        password <- Option(System.getenv().get("SONATYPE_PASSWORD"))
-      } yield
-        Credentials(
-          "Sonatype Nexus Repository Manager",
-          "oss.sonatype.org",
-          username,
-          password
-        )
-    ).toSeq,
     publishArtifact in Test := false,
-    releasePublishArtifactsAction := PgpKeys.publishSigned.value,
     scmInfo := Some(
       ScmInfo(
-        url("https://github.com/ChristopherDavenport/cats-scalacheck"),
-        "git@github.com:ChristopherDavenport/cats-scalacheck.git"
+        url("https://github.com/Epitech/epitest-cats-scalacheck"),
+        "git@github.com:Epitech/epitest-cats-scalacheck.git"
       )
     ),
-    homepage := Some(url("https://github.com/ChristopherDavenport/cats-scalacheck")),
+    homepage := Some(url("https://github.com/Epitech/cats-scalacheck")),
     licenses += ("MIT", url("http://opensource.org/licenses/MIT")),
     publishMavenStyle := true,
     pomIncludeRepository := { _ =>
@@ -142,43 +102,13 @@ lazy val micrositeSettings = Seq(
     "-Ywarn-dead-code",
     "-Ywarn-unused:imports",
     "-Xlint:-missing-interpolator,_"
-  ),
-  libraryDependencies += "com.47deg" %% "github4s" % "0.20.1",
-  micrositePushSiteWith := GitHub4s,
-  micrositeGithubToken := sys.env.get("GITHUB_TOKEN")
+  )
 )
 
-// Not Used Currently
-lazy val mimaSettings = {
-  import sbtrelease.Version
-  def mimaVersion(version: String) = {
-    Version(version) match {
-      case Some(Version(major, Seq(minor, patch), _)) if patch.toInt > 0 =>
-        Some(s"${major}.${minor}.${patch.toInt - 1}")
-      case _ =>
-        None
-    }
-  }
-
-  Seq(
-    mimaFailOnProblem := mimaVersion(version.value).isDefined,
-    mimaPreviousArtifacts := (mimaVersion(version.value) map {
-      organization.value % s"${moduleName.value}_${scalaBinaryVersion.value}" % _
-    }).toSet,
-    mimaBinaryIssueFilters ++= {
-      import com.typesafe.tools.mima.core._
-      import com.typesafe.tools.mima.core.ProblemFilters._
-      Seq()
-    }
-  )
-}
-
 lazy val noPublishSettings = {
-  import com.typesafe.sbt.pgp.PgpKeys.publishSigned
   Seq(
     publish := {},
     publishLocal := {},
-    publishSigned := {},
     publishArtifact := false
   )
 }
